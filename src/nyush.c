@@ -15,13 +15,16 @@ int main() {
     char* lastslash = strrchr(buffer, '/');
     basedir = (lastslash != buffer) ? lastslash + 1 : buffer;
 
-    while(1){
+    printf("[nyush %s]$ ", basedir);
+    fflush(stdout);
+
+    /*while(1){
         printf("[nyush %s]$ ", basedir);
         fflush(stdout);
         while(1){
             continue;
         };
-    };
+    };*/
     
     free(buffer);
 }
