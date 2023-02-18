@@ -7,6 +7,12 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+
+int isvalid(){
+    //TODO
+    return 1;
+}
 
 int main() {
     //get base dir
@@ -18,19 +24,52 @@ int main() {
 
     //printf("[nyush %s]$ ", basedir);
     //fflush(stdout);
-
+    char* line_buffer = NULL;
     while(1){
+        //free memory
+        free(line_buffer);
+
         //print prompt
         printf("[nyush %s]$ ", basedir);
         fflush(stdout);
 
         //read the command
-        char* line_buffer = NULL;
-        size_t line_len = 0;
-        getline(&line_buffer, &line_len, stdin);
-        free(line_buffer);
-        
+        line_buffer = NULL;  //
+        size_t n = 0;
+        int line_len = getline(&line_buffer, &n, stdin); //check return val TODO
+        line_buffer[line_len-1] = '\0'; //remove new line
+
+        //check command validity
+        if (!isvalid()){
+            printf("Error: invalid command\n");
+            fflush(stdout);
+            continue;
+        };
+
+        //handle builtin commands
+
+        //handle simple programs
+        pid_t child_pid = fork();
+        if (child_pid == -1){
+            printf("fork error\n");
+        }
+        else if (child_pid == 0){
+            char *args[2];
+            args[0] = line_buffer;
+            args[1] = NULL; 
+            printf("%s", line_buffer);
+
+            if (execv(args[0], args) == -1){
+                printf("exec error\n");
+            }; 
+            
+        }
+        else{
+            wait(NULL); //change to not null if status needed
+        };
+
     };
     
     free(buffer);
 }
+
