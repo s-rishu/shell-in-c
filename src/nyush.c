@@ -9,22 +9,28 @@
 #include <string.h>
 
 int main() {
+    //get base dir
     char* buffer = malloc(FILENAME_MAX*sizeof(char));
     getcwd(buffer, FILENAME_MAX); //handle error for large filenames
     char* basedir;
     char* lastslash = strrchr(buffer, '/');
     basedir = (lastslash != buffer) ? lastslash + 1 : buffer;
 
-    printf("[nyush %s]$ ", basedir);
-    fflush(stdout);
+    //printf("[nyush %s]$ ", basedir);
+    //fflush(stdout);
 
-    /*while(1){
+    while(1){
+        //print prompt
         printf("[nyush %s]$ ", basedir);
         fflush(stdout);
-        while(1){
-            continue;
-        };
-    };*/
+
+        //read the command
+        char* line_buffer = NULL;
+        size_t line_len = 0;
+        getline(&line_buffer, &line_len, stdin);
+        free(line_buffer);
+        
+    };
     
     free(buffer);
 }
