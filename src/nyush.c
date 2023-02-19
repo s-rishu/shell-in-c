@@ -9,9 +9,11 @@
 #include <string.h>
 #include <sys/wait.h>
 
+#include "builtincmd.h"
+
 int getCommandType(){
     //TODO
-    return 2;
+    return 1;
 }
 
 void updateCommandList(char** cmd_list){
@@ -70,43 +72,23 @@ void handleBinCommands(char** cmd_list){
     };
 }
 
-void handleBuiltinCommands(char* line_buffer){
-    pid_t child_pid = fork();
-    if (child_pid == -1){
-        printf("fork error\n");
+void handleBuiltinCommands(char** cmd_list){
+    if(!strcmp(cmd_list[0], "cd")){
+        runCd(cmd_list);
     }
-    else if (child_pid == 0){
-        char full_cmd[1000] = "";
-        getFullPath(line_buffer, full_cmd);
-        char *args[2];
-        args[0] = full_cmd;
-        args[1] = NULL; 
-        // printf("%s\n", full_cmd);
-
-        if (execv(args[0], args) == -1){
-            printf("exec error\n");
-        }; 
-            
-    }
-    else{
-        wait(NULL); //change to not null if status needed
-    };
 }
 
 int main() {
-    //get base dir
-    char* buffer = malloc(FILENAME_MAX*sizeof(char));
-    getcwd(buffer, FILENAME_MAX); //handle error for large filenames
-    char* basedir;
-    char* lastslash = strrchr(buffer, '/');
-    basedir = (lastslash != buffer) ? lastslash + 1 : buffer;
-
-    //printf("[nyush %s]$ ", basedir);
-    //fflush(stdout);
-    
     while(1){
         //free memory
         //free(line_buffer);
+
+        //get base dir
+        char* buffer = malloc(FILENAME_MAX*sizeof(char));
+        getcwd(buffer, FILENAME_MAX); //handle error for large filenames
+        char* basedir;
+        char* lastslash = strrchr(buffer, '/');
+        basedir = (lastslash != buffer) ? lastslash + 1 : buffer;
 
         //print prompt
         printf("[nyush %s]$ ", basedir);
@@ -122,16 +104,16 @@ int main() {
                 printf("Error: invalid command\n");
                 break;
             case 1: //handle builtin commands
-                //handleBuiltinCommands(line_buffer);
+                handleBuiltinCommands(cmd_list);
                 break;
             case 2: //handle system commands
                 handleBinCommands(cmd_list);
                 break;
         };
-
+        free(buffer);
 
     };
     
-    free(buffer);
+    
 }
 
