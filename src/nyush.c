@@ -5,6 +5,8 @@
 4.https://www.geeksforgeeks.org/pipe-system-call/
 5.https://stackoverflow.com/questions/39002052/how-i-can-print-to-stderr-in-c
 6.https://stackoverflow.com/questions/11042218/c-restore-stdout-to-terminal
+7.https://man7.org/linux/man-pages/man2/pipe.2.html
+8.https://stackoverflow.com/questions/36016477/pipeline-communication-between-child-process-and-parent-process-using-pipe
 */
 
 #include <stdio.h>
@@ -78,18 +80,21 @@ void handleOtherCommands(char*** cmd_list){
     };
 
     int curr_cmd_idx = 0;
+    int pipefd[2] = {-1, -1};
+
+    int stdin_backup = dup(0);
+    int stdout_backup = dup(1);
+   // int prev_pipe_out_fd;
     while(curr_cmd_idx < len_cmd_list){
-        //printf("in while 1\n");
+        printf("in while 1\n");
         char** curr_cmd = cmd_list[curr_cmd_idx];
-        int len_curr_cmd= 0;
+        int len_curr_cmd = 0;
         while(curr_cmd[len_curr_cmd] != NULL){\
             len_curr_cmd++;
         };
              
         int curr_word_idx = 0;
         int curr_word_idx_end = len_curr_cmd;
-        int stdin_backup = dup(0);
-        int stdout_backup = dup(1);
         int in_file_des = -1;
         int out_file_des = -1;
         while(curr_cmd[curr_word_idx] != NULL){
@@ -98,11 +103,12 @@ void handleOtherCommands(char*** cmd_list){
             if (!strcmp(curr_cmd[curr_word_idx], "<")){
                 curr_word_idx_end = curr_word_idx;
                 in_file_des = open(curr_cmd[curr_word_idx+1], O_RDONLY);
-                dup2(in_file_des, 0);
+                dup2(in_file_des, 0);               
                 if (in_file_des == -1){
                     fprintf(stderr, "Error: invalid file\n");
                     return;
                 };
+                close(in_file_des);
             }
             else if(!strcmp(curr_cmd[curr_word_idx], ">")){
                 if(curr_word_idx_end > curr_word_idx){
@@ -115,6 +121,7 @@ void handleOtherCommands(char*** cmd_list){
                     fprintf(stderr, "Error: output redirection error\n");
                     return;
                 };
+                close(out_file_des);
             }
             else if(!strcmp(curr_cmd[curr_word_idx], ">>")){
                 if(curr_word_idx_end > curr_word_idx){
@@ -126,19 +133,38 @@ void handleOtherCommands(char*** cmd_list){
                     fprintf(stderr, "Error: output redirection error\n");
                     return;
                 };
+                close(out_file_des);
                 }
+
+            
             curr_word_idx++;
            // break;
         }
 
-        fprintf(stdout, "curr end index %d", curr_word_idx_end);
         curr_cmd[curr_word_idx_end] = NULL; // reset arg list upto before < 
+
+        //handle piping
+        if (len_cmd_list > 1 && curr_cmd_idx < len_cmd_list-1){
+            int pipe_ret = pipe(pipefd);
+            printf("pipe in: %d pipe out: %d\n", pipefd[1], pipefd[0]);
+            if (pipe_ret == -1){
+                fprintf(stderr, "Error: pipe()\n");
+                return;
+            };
+           
+            
+        };
 
         pid_t child_pid = fork();
         if (child_pid == -1){
             printf("fork error\n");
         }
         else if (child_pid == 0){
+            if (len_cmd_list > 1 && curr_cmd_idx < len_cmd_list-1){
+                close(pipefd[0]);
+                dup2(pipefd[1], 1);
+                close(pipefd[1]);
+            }
             char full_cmd[20] = "";
             getFullPath(curr_cmd[0], full_cmd);
 
@@ -150,14 +176,17 @@ void handleOtherCommands(char*** cmd_list){
                 
         }
         else{
+            dup2(stdin_backup, 0);
+            dup2(stdout_backup, 1);
+            if (len_cmd_list > 1 && curr_cmd_idx < len_cmd_list-1){
+                close(pipefd[1]);
+                dup2(pipefd[0], 0);
+                close(pipefd[0]);
+            }
             wait(NULL); //change to not null if status needed
             //restore stdin and stdout
             printf("exec done");
-            dup2(stdin_backup, 0);
-            dup2(stdout_backup, 1);
 
-            close(in_file_des);
-            close(out_file_des);
         };
 
         curr_cmd_idx++;
