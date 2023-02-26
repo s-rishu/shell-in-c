@@ -2,5 +2,6 @@
 #define _BUILTINCMD_H_
 
 void runCd(char **cmd_list);
+void runExit();
 
 #endif

@@ -85,6 +85,7 @@ int getCommandType(char*** cmd_list){
             word_idx++;
             word = curr_cmd[word_idx];
         }
+        printf("null at idx: %d\n", word_idx);
 
         idx++;
         curr_cmd = cmd_list[idx];

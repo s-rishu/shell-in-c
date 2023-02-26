@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/wait.h>
 
 void runCd(char **cmd_list){
     printf("chdir\n");
-    if(chdir(cmd_list[1]) == -1){
+    //error handling
+    if(access(cmd_list[1], F_OK)==-1){
+        fprintf(stderr, "Error: invalid directory\n");
+    }
+    else if(chdir(cmd_list[1]) == -1){
         printf("chdir error\n");
     };
 }
@@ -19,6 +21,6 @@ void runCd(char **cmd_list){
 
 // }
 
-// void runExit(){
-
-// }
+void runExit(){
+    exit(EXIT_SUCCESS); //TODO : check for suspended jobs
+}
