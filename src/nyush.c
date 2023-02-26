@@ -7,6 +7,7 @@
 6.https://stackoverflow.com/questions/11042218/c-restore-stdout-to-terminal
 7.https://man7.org/linux/man-pages/man2/pipe.2.html
 8.https://stackoverflow.com/questions/36016477/pipeline-communication-between-child-process-and-parent-process-using-pipe
+9.https://www.geeksforgeeks.org/signals-c-language/
 */
 
 #include <stdio.h>
@@ -15,6 +16,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include "builtincmd.h"
 #include "validator.h"
@@ -25,6 +27,9 @@ int updateCommandList(char*** cmd_list){
     //line_buffer = NULL;  //
     size_t n = 0;
     int line_len = getline(&line_buffer, &n, stdin); //check return val TODO
+    if (line_len == -1){
+        exit(EXIT_SUCCESS); //exit on eof
+    }
     line_buffer[line_len-1] = '\0'; //remove new line
     line_len--;
     if (line_len == 0){
@@ -41,12 +46,12 @@ int updateCommandList(char*** cmd_list){
         int idx1 = 0;
         while (token1 != NULL){
              list[idx1] = token1;
-             printf("list %s\n", list[idx1]);
+             //printf("list %s\n", list[idx1]);
              idx1 = idx1+1;
              token1 = strtok(NULL, " ");
          };
         list[idx1] = NULL;
-        printf("should be null %s\n", list[idx1]);
+        //printf("should be null %s\n", list[idx1]);
         cmd_list[idx] = list;
         idx = idx+1;
         token = multi_tok(NULL, " | "); 
@@ -57,20 +62,35 @@ int updateCommandList(char*** cmd_list){
     return type;
 }
 
-void getFullPath(char* cmd, char* full_cmd){
+int getFullPath(char* cmd, char* full_cmd){
 
     //char temp[1000] = "";
     //strcpy(temp, line_buffer);
-    char* first = strtok(cmd, "/");
-
-    if(strcmp(first, "bin")){
-        strcpy(full_cmd, "/bin/");
-        strcat(full_cmd, cmd);
-        //printf("fullcmd%s\n", full_cmd);
-    }
-    else{
+    if (cmd[0]=='/'){
         strcpy(full_cmd, cmd);
     }
+    else{
+        int idx = 0;
+        int slash_flag = 0;
+        while(idx < (int)strlen(cmd)){
+            if (cmd[idx] == '/'){
+                slash_flag = 1;
+                strcpy(full_cmd, "./");
+                strcat(full_cmd, cmd);
+                break;
+            }
+            idx++;
+        }
+        if (!slash_flag){
+            strcpy(full_cmd, "/usr/bin/");
+            strcat(full_cmd, cmd);
+        }
+        
+    }
+    if(access(full_cmd, F_OK)==-1){
+        return 0;
+    }
+    return 1;
 }
 
 void handleOtherCommands(char*** cmd_list){
@@ -86,7 +106,7 @@ void handleOtherCommands(char*** cmd_list){
     int stdout_backup = dup(1);
    // int prev_pipe_out_fd;
     while(curr_cmd_idx < len_cmd_list){
-        printf("in while 1\n");
+        //printf("in while 1\n");
         char** curr_cmd = cmd_list[curr_cmd_idx];
         int len_curr_cmd = 0;
         while(curr_cmd[len_curr_cmd] != NULL){\
@@ -114,7 +134,7 @@ void handleOtherCommands(char*** cmd_list){
                 if(curr_word_idx_end > curr_word_idx){
                     curr_word_idx_end = curr_word_idx;
                 };
-                printf("curr filename: %s\n", curr_cmd[curr_word_idx+1]);
+                //printf("curr filename: %s\n", curr_cmd[curr_word_idx+1]);
                 out_file_des = open(curr_cmd[curr_word_idx+1], O_WRONLY|O_CREAT|O_TRUNC);
                 dup2(out_file_des, 1);
                 if (out_file_des == -1){
@@ -146,7 +166,7 @@ void handleOtherCommands(char*** cmd_list){
         //handle piping
         if (len_cmd_list > 1 && curr_cmd_idx < len_cmd_list-1){
             int pipe_ret = pipe(pipefd);
-            printf("pipe in: %d pipe out: %d\n", pipefd[1], pipefd[0]);
+            //printf("pipe in: %d pipe out: %d\n", pipefd[1], pipefd[0]);
             if (pipe_ret == -1){
                 fprintf(stderr, "Error: pipe()\n");
                 return;
@@ -157,21 +177,30 @@ void handleOtherCommands(char*** cmd_list){
 
         pid_t child_pid = fork();
         if (child_pid == -1){
-            printf("fork error\n");
+            fprintf(stderr, "Error: fork()\n");
         }
         else if (child_pid == 0){
+
+            //reset signal handlers to default
+            signal(SIGINT, SIG_DFL);
+            signal(SIGQUIT, SIG_DFL);
+            signal(SIGTSTP, SIG_DFL);
+
             if (len_cmd_list > 1 && curr_cmd_idx < len_cmd_list-1){
                 close(pipefd[0]);
                 dup2(pipefd[1], 1);
                 close(pipefd[1]);
             }
             char full_cmd[20] = "";
-            getFullPath(curr_cmd[0], full_cmd);
+            if (!getFullPath(curr_cmd[0], full_cmd)){
+                fprintf(stderr, "Error: invalid program\n");
+                return;
+            };
 
             curr_cmd[0] = full_cmd;
-            printf("running exec");
+            //printf("running exec");
             if (execv(curr_cmd[0], curr_cmd) == -1){
-                printf("exec error\n");
+                fprintf(stderr,"Error: execv()\n");
             }; 
                 
         }
@@ -185,7 +214,7 @@ void handleOtherCommands(char*** cmd_list){
             }
             wait(NULL); //change to not null if status needed
             //restore stdin and stdout
-            printf("exec done");
+            //printf("exec done");
 
         };
 
@@ -202,9 +231,19 @@ void handleBuiltinCommands(char** cmd_list){
     else if(!strcmp(cmd_list[0], "exit")){
         runExit();
     }
+    else if(!strcmp(cmd_list[0], "jobs")){
+        runJobs();
+    }
+    else if(!strcmp(cmd_list[0], "fg")){
+        runFg();
+    }
 }
 
 int main() {
+    //ignore certain signals
+    signal(SIGINT, SIG_IGN);
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
     while(1){
         //free memory
         //free(line_buffer);
@@ -230,14 +269,14 @@ int main() {
                 fprintf(stderr, "Error: invalid command\n");
                 break;
             case 1: //handle empty line
-                printf("DEBUG: Empty Line\n");
+                //printf("DEBUG: Empty Line\n");
                 break;
             case 2: //handle builtin commands
-                printf("DEBUG: Builtin Command\n");
+                //printf("DEBUG: Builtin Command\n");
                 handleBuiltinCommands(cmd_list[0]);
                 break;
             case 3: //handle system commands
-                printf("DEBUG: Other Commands\n");
+                //printf("DEBUG: Other Commands\n");
                 handleOtherCommands(cmd_list);
                 break;
         };
