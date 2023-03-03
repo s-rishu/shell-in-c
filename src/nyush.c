@@ -70,6 +70,9 @@ int getFullPath(char* cmd, char* full_cmd){
     //strcpy(temp, line_buffer);
     if (cmd[0]=='/'){
         strcpy(full_cmd, cmd);
+        if(access(full_cmd, F_OK)==-1){
+            return 0;
+        }
     }
     else{
         int idx = 0;
@@ -84,14 +87,23 @@ int getFullPath(char* cmd, char* full_cmd){
             idx++;
         }
         if (!slash_flag){
-            strcpy(full_cmd, "/usr/bin/");
-            strcat(full_cmd, cmd);
+            char temp[100];
+            strcpy(temp, "/usr/bin/");
+            strcat(temp, cmd);
+            if(access(temp, F_OK)==-1){
+                return 0;
+            }
+            strcpy(full_cmd, cmd);
+
+        }
+        else{
+            if(access(full_cmd, F_OK)==-1){
+                return 0;
+            }
         }
         
     }
-    if(access(full_cmd, F_OK)==-1){
-        return 0;
-    }
+    
     return 1;
 }
 
@@ -209,7 +221,7 @@ void handleOtherCommands(char*** cmd_list, pid_t* pid_sus, char** cmd_sus, char*
 
             curr_cmd[0] = full_cmd;
             //printf("running exec");
-            if (execv(curr_cmd[0], curr_cmd) == -1){
+            if (execvp(curr_cmd[0], curr_cmd) == -1){
                 fprintf(stderr,"Error: execv()\n");
             }; 
             exit(0);
