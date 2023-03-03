@@ -128,7 +128,10 @@ void handleOtherCommands(char*** cmd_list, pid_t* pid_sus, char** cmd_sus, char*
             //printf("in while %s\n", curr_cmd[curr_word_idx]);
             //handle io redirection
             if (!strcmp(curr_cmd[curr_word_idx], "<")){
-                curr_word_idx_end = curr_word_idx;
+                //curr_word_idx_end = curr_word_idx;
+                if(curr_word_idx_end > curr_word_idx){
+                    curr_word_idx_end = curr_word_idx;
+                };
                 in_file_des = open(curr_cmd[curr_word_idx+1], O_RDONLY);
                 dup2(in_file_des, 0);               
                 if (in_file_des == -1){
